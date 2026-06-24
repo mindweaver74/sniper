@@ -120,7 +120,7 @@ window.addEventListener('resize',resize);resize();
 var bestScore=+(localStorage.getItem('snBest')||0);
 
 // ── 상태 ──
-var score=0,lives=3,stage=1,combo=0,maxCombo=0,perfects=0;
+var score=0,lives=3,stage=1,combo=0,maxCombo=0,perfects=0,shots=0;
 var gameActive=false,frame=0,waiting=false,waitTimer=0;
 var shotResult=null,shotTimer=0;
 var raccoonReaction='',raccoonTimer=0;
@@ -204,6 +204,18 @@ function getGrade(acc){
   return GRADES[GRADES.length-1];
 }
 
+
+function showStageBanner(){
+  var el=document.getElementById('stage-val');
+  el.style.color='#ff0';
+  el.style.transform='scale(1.5)';
+  el.style.transition='all .3s';
+  el.textContent=stage;
+  setTimeout(function(){
+    el.style.color='#fff';
+    el.style.transform='scale(1)';
+  },600);
+}
 // ── 발사 ──
 var screenShake=0;
 function shoot(){
@@ -242,9 +254,14 @@ function shoot(){
   showResult(grade,acc);
   updateCombo();
 
-  // 스테이지 진행 체크 (10발마다)
-  if(score>0&&score%(stage*2000)===0){
-    stage++;initStage();
+  // 10발 명중마다 스테이지 업
+  if(grade.label!=='MISS'){
+    shots++;
+    if(shots>0&&shots%10===0){
+      stage++;
+      showStageBanner();
+      initStage();
+    }
   }
 
   // 대기 후 다음 발사
@@ -702,7 +719,7 @@ function drawScope(){
 // ── 스테이지 진행 표시 ──
 function drawStageProgress(){
   // 스테이지별 쌓이는 게이지
-  var pct=(score%(stage*2000))/(stage*2000);
+  var pct=(shots%10)/10;
   ctx.fillStyle='rgba(255,255,255,0.06)';
   ctx.fillRect(0,H-3,W,3);
   var gg=ctx.createLinearGradient(0,0,W*pct,0);
@@ -842,7 +859,7 @@ function startGame(){
   getSfx();
   score=0;lives=3;stage=1;combo=0;maxCombo=0;perfects=0;
   particles=[];bulletTrails=[];screenShake=0;
-  raccoonReaction='';raccoonTimer=0;
+  raccoonReaction='';raccoonTimer=0;shots=0;
   initForestBg();
   document.getElementById('score-val').textContent='0';
   document.getElementById('combo-val').textContent='x1';
