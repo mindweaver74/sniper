@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>타이밍 저격</title>
+<!-- Google AdSense -->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8357338943233901"
+     crossorigin="anonymous"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;}
+html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0a0a0a;font-family:-apple-system,Arial,sans-serif;}
+#c{display:block;position:fixed;top:0;left:0;width:100%;height:100%;z-index:1;cursor:crosshair;}
+
+/* HUD */
+#hud{position:fixed;top:0;left:0;width:100%;z-index:10;pointer-events:none;
+  display:flex;justify-content:space-between;align-items:flex-start;
+  padding:max(12px,env(safe-area-inset-top)) 16px 0;}
+.hud-box{text-align:center;}
+.hud-lbl{font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:1px;}
+.hud-val{font-size:24px;font-weight:900;color:#fff;text-shadow:0 0 12px rgba(255,50,50,0.8);}
+
+/* 콤보 */
+#combo-disp{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  font-size:38px;font-weight:900;color:#f00;
+  text-shadow:0 0 20px #f00;opacity:0;
+  pointer-events:none;z-index:20;white-space:nowrap;}
+
+/* 결과 팝업 */
+#result-pop{position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);
+  text-align:center;pointer-events:none;z-index:20;opacity:0;}
+#result-grade{font-size:52px;font-weight:900;}
+#result-pct{font-size:18px;color:rgba(255,255,255,0.7);margin-top:4px;}
+
+/* 남은 목숨 */
+#lives-bar{position:fixed;bottom:max(20px,env(safe-area-inset-bottom)+12px);left:50%;
+  transform:translateX(-50%);display:flex;gap:8px;z-index:10;pointer-events:none;}
+.life-dot{width:12px;height:12px;border-radius:50%;background:#f00;
+  box-shadow:0 0 8px #f00;transition:all .3s;}
+.life-dot.dead{background:#333;box-shadow:none;}
+
+/* 오버레이 */
+#overlay{position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,0.95);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;z-index:100;text-align:center;
+  padding:24px;padding-top:max(24px,env(safe-area-inset-top));
+  padding-bottom:max(24px,env(safe-area-inset-bottom));}
+.ov-title{font-size:52px;font-weight:900;letter-spacing:-2px;
+  background:linear-gradient(135deg,#f00,#f80,#ff0);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;margin-bottom:6px;}
+.ov-sub{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:24px;line-height:1.8;}
+.ov-score{font-size:80px;font-weight:900;color:#fff;line-height:1;display:none;}
+.ov-score-lbl{font-size:12px;color:rgba(255,255,255,0.35);display:none;margin-top:2px;}
+.ov-best{font-size:14px;color:#ffd700;display:none;margin-top:6px;margin-bottom:20px;}
+.ov-stats{display:none;flex-direction:row;gap:10px;margin-bottom:20px;width:100%;max-width:300px;}
+.ov-stat{flex:1;background:rgba(255,255,255,0.06);border-radius:12px;padding:10px 6px;text-align:center;}
+.ov-stat-val{font-size:22px;font-weight:700;}
+.ov-stat-lbl{font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;}
+#play-btn{padding:15px 52px;border-radius:50px;border:none;font-size:17px;font-weight:700;
+  cursor:pointer;background:linear-gradient(135deg,#f00,#f80);color:#fff;
+  -webkit-appearance:none;min-width:200px;z-index:110;
+  box-shadow:0 4px 24px rgba(255,50,0,0.5);}
+.ov-tip{font-size:11px;color:rgba(255,255,255,0.2);margin-top:14px;line-height:1.9;}
+
+/* footer */
+#footer{position:fixed;bottom:0;left:0;width:100%;
+  padding:4px 16px max(6px,env(safe-area-inset-bottom));
+  display:flex;justify-content:space-between;pointer-events:none;z-index:5;}
+#footer a{font-size:10px;color:rgba(255,255,255,0.2);text-decoration:none;pointer-events:all;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div class="hud-box"><div class="hud-lbl">SCORE</div><div class="hud-val" id="score-val">0</div></div>
+  <div class="hud-box"><div class="hud-lbl">STAGE</div><div class="hud-val" id="stage-val">1</div></div>
+  <div class="hud-box"><div class="hud-lbl">COMBO</div><div class="hud-val" id="combo-val">x1</div></div>
+</div>
+
+<div id="combo-disp"></div>
+<div id="result-pop"><div id="result-grade"></div><div id="result-pct"></div></div>
+<div id="lives-bar"></div>
+
+<div id="footer">
+  <a href="https://mindweaver74.github.io/Jutopia">🎮 Jutopia</a>
+  <a href="https://mindweaver74.github.io/Jutopia/privacy.html">개인정보처리방침</a>
+</div>
+
+<div id="overlay">
+  <div class="ov-title">🎯 타이밍 저격</div>
+  <div class="ov-sub">조준경이 과녁과 겹치는 순간 탭!<br>정확할수록 고득점 · 3번 실패하면 종료</div>
+  <div class="ov-score" id="ov-score"></div>
+  <div class="ov-score-lbl" id="ov-score-lbl">점수</div>
+  <div class="ov-best" id="ov-best"></div>
+  <div class="ov-stats" id="ov-stats">
+    <div class="ov-stat"><div class="ov-stat-val" id="st-perfect">0</div><div class="ov-stat-lbl">퍼펙트</div></div>
+    <div class="ov-stat"><div class="ov-stat-val" id="st-combo">0</div><div class="ov-stat-lbl">최대 콤보</div></div>
+    <div class="ov-stat"><div class="ov-stat-val" id="st-stage">1</div><div class="ov-stat-lbl">도달 스테이지</div></div>
+  </div>
+  <button id="play-btn">🎯 저격 시작</button>
+  <div class="ov-tip">화면 어디든 탭하면 발사!<br>과녁 중앙에 가까울수록 높은 점수<br>스테이지마다 속도와 패턴이 변함</div>
+</div>
+
+<script>
+var canvas=document.getElementById('c');
+var ctx=canvas.getContext('2d');
+var W,H,CX,CY;
+
+function resize(){
+  W=canvas.width=window.innerWidth;
+  H=canvas.height=window.innerHeight;
+  CX=W/2;CY=H/2;
+}
+window.addEventListener('resize',resize);resize();
+
+var bestScore=+(localStorage.getItem('snBest')||0);
+
+// ── 상태 ──
+var score=0,lives=3,stage=1,combo=0,maxCombo=0,perfects=0;
+var gameActive=false,frame=0,waiting=false,waitTimer=0;
+var shotResult=null,shotTimer=0;
+var raccoonReaction='',raccoonTimer=0;
+var particles=[];
+
+// ── 과녁 ──
+var target={x:CX,y:CY,r:0};
+
+// ── 조준경 ──
+var scope={
+  x:CX,y:CY,      // 현재 위치
+  angle:0,         // 궤도 각도
+  orbitR:0,        // 궤도 반경
+  orbitSpd:0,      // 궤도 속도
+  wobble:0,        // 흔들림 위상
+  wobbleAmp:0,     // 흔들림 크기
+  wobbleSpd:0,     // 흔들림 속도
+  r:60,            // 조준경 반경
+};
+
+// ── 스테이지 설정 ──
+function getStageConfig(s){
+  var speed=0.016+s*0.005;
+  var targetR=Math.max(18,55-s*3);
+  var scopeR=Math.max(25,65-s*2.5);
+  var orbitR=Math.min(targetR*0.6+s*3, targetR+scopeR*0.4);
+  return{
+    orbitSpd: Math.min(speed, 0.08),
+    orbitR:   orbitR,
+    wobbleAmp:Math.min(s*2,12),
+    wobbleSpd:0.04+s*0.005,
+    targetR:  Math.max(18,55-s*3),   // 과녁 크기 (점점 작아짐)
+    scopeR:   Math.max(25,65-s*2.5), // 조준경 크기
+    waitMin:  Math.max(20,60-s*3),   // 다음 발사까지 대기
+    waitMax:  Math.max(40,120-s*4),
+    multiOrbit: s>=5, // 5스테이지부터 복수 궤도
+  };
+}
+
+function initStage(){
+  var cfg=getStageConfig(stage);
+  target.x=CX+((Math.random()-0.5)*W*0.3);
+  target.y=CY+((Math.random()-0.5)*H*0.25);
+  target.r=cfg.targetR;
+  scope.orbitR=cfg.orbitR;
+  scope.orbitSpd=cfg.orbitSpd*(Math.random()<0.5?1:-1);
+  scope.wobbleAmp=cfg.wobbleAmp;
+  scope.wobbleSpd=cfg.wobbleSpd;
+  scope.r=cfg.scopeR;
+  scope.angle=Math.random()*Math.PI*2;
+  scope.wobble=Math.random()*Math.PI*2;
+  waiting=false;
+  document.getElementById('stage-val').textContent=stage;
+}
+
+// ── 거리 계산 ──
+function getDist(){
+  var dx=scope.x-target.x,dy=scope.y-target.y;
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
+// ── 정확도 계산 ──
+function getAccuracy(){
+  var dist=getDist();
+  var hitZone=target.r+scope.r;
+  if(dist>hitZone)return 0;
+  // 중심일수록 1.0에 가까움
+  return Math.max(0,1-dist/hitZone);
+}
+
+// ── 등급 ──
+var GRADES=[
+  {min:0.92,label:'PERFECT',color:'#ff0',pts:1000,shake:0},
+  {min:0.75,label:'GREAT',  color:'#0f8',pts:600, shake:0},
+  {min:0.55,label:'GOOD',   color:'#4af',pts:300, shake:0},
+  {min:0.30,label:'OK',     color:'#aaa',pts:100, shake:0},
+  {min:0,   label:'MISS',   color:'#f44',pts:0,   shake:8},
+];
+function getGrade(acc){
+  for(var i=0;i<GRADES.length;i++){if(acc>=GRADES[i].min)return GRADES[i];}
+  return GRADES[GRADES.length-1];
+}
+
+// ── 발사 ──
+var screenShake=0;
+function shoot(){
+  if(!gameActive||waiting)return;
+  var acc=getAccuracy();
+  var grade=getGrade(acc);
+
+  if(grade.label==='MISS'){
+    lives--;updateLives();
+    combo=0;
+    screenShake=10;
+    sfxMiss();
+    raccoonReaction='miss'; raccoonTimer=90;
+    addParticles(scope.x,scope.y,'#f44',10,5);
+    if(lives<=0){setTimeout(endGame,600);return;}
+  } else {
+    var mult=Math.min(combo+1,8);
+    var pts=grade.pts*mult;
+    score+=pts;
+    if(grade.label==='PERFECT')perfects++;
+    combo++;
+    if(combo>maxCombo)maxCombo=combo;
+    screenShake=grade.shake;
+    sfxShoot(acc);
+    addParticles(target.x,target.y,grade.color,16,6);
+    addBulletTrail(scope.x,scope.y,target.x,target.y,grade.color);
+    // 너구리 리액션
+    if(grade.label==='PERFECT') { raccoonReaction='perfect'; raccoonTimer=100; }
+    else if(grade.label==='GREAT') { raccoonReaction='great'; raccoonTimer=90; }
+    else if(grade.label==='GOOD') { raccoonReaction='good'; raccoonTimer=80; }
+    else { raccoonReaction='ok'; raccoonTimer=70; }
+    document.getElementById('score-val').textContent=score;
+  }
+
+  // 결과 표시
+  showResult(grade,acc);
+  updateCombo();
+
+  // 스테이지 진행 체크 (10발마다)
+  if(score>0&&score%(stage*2000)===0){
+    stage++;initStage();
+  }
+
+  // 대기 후 다음 발사
+  waiting=true;
+  var cfg=getStageConfig(stage);
+  waitTimer=cfg.waitMin+Math.floor(Math.random()*(cfg.waitMax-cfg.waitMin));
+
+  // 과녁 위치 변경
+  setTimeout(function(){
+    if(!gameActive)return;
+    target.x=CX+((Math.random()-0.5)*W*0.35);
+    target.y=CY+((Math.random()-0.5)*H*0.28);
+    target.x=Math.max(target.r+20,Math.min(W-target.r-20,target.x));
+    target.y=Math.max(target.r+70,Math.min(H-target.r-80,target.y));
+    // 조준경 새 궤도
+    var ncfg=getStageConfig(stage);
+    scope.orbitR=ncfg.orbitR*(0.8+Math.random()*0.4);
+    scope.orbitSpd=ncfg.orbitSpd*(Math.random()<0.5?1:-1);
+    scope.wobbleAmp=ncfg.wobbleAmp*(0.7+Math.random()*0.6);
+    waiting=false;
+  },waitTimer*16);
+}
+
+function showResult(grade,acc){
+  var el=document.getElementById('result-pop');
+  var ge=document.getElementById('result-grade');
+  var pe=document.getElementById('result-pct');
+  ge.textContent=grade.label;
+  ge.style.color=grade.color;
+  ge.style.textShadow='0 0 20px '+grade.color;
+  pe.textContent=Math.round(acc*100)+'%';
+  pe.style.color=grade.color;
+  el.style.opacity='1';
+  el.style.transform='translate(-50%,-55%)';
+  el.style.transition='none';
+  setTimeout(function(){
+    el.style.transition='all .4s ease-out';
+    el.style.opacity='0';
+    el.style.transform='translate(-50%,-70%)';
+  },500);
+}
+
+function updateCombo(){
+  var el=document.getElementById('combo-val');
+  el.textContent='x'+Math.min(combo+1,8);
+  el.style.color=combo>=4?'#ff0':combo>=2?'#0f8':'#fff';
+  if(combo>=2){
+    var cd=document.getElementById('combo-disp');
+    cd.textContent=combo+'콤보!';
+    cd.style.opacity='1';
+    setTimeout(function(){cd.style.opacity='0';},600);
+  }
+}
+
+function updateLives(){
+  var bar=document.getElementById('lives-bar');
+  bar.innerHTML='';
+  for(var i=0;i<3;i++){
+    var d=document.createElement('div');
+    d.className='life-dot'+(i>=lives?' dead':'');
+    bar.appendChild(d);
+  }
+}
+
+// ── 총알 궤적 ──
+var bulletTrails=[];
+function addBulletTrail(x1,y1,x2,y2,color){
+  bulletTrails.push({x1:x1,y1:y1,x2:x2,y2:y2,life:1,color:color});
+}
+
+// ── 파티클 ──
+function addParticles(x,y,color,n,sp){
+  for(var i=0;i<n;i++){
+    var a=Math.random()*Math.PI*2,s=(0.5+Math.random())*sp;
+    particles.push({x:x,y:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,color:color,sz:2+Math.random()*5});
+  }
+}
+
+// ── 배경 그리기 (숲) ──
+var bgTrees=[];
+var bgLeaves=[];
+function initForestBg(){
+  bgTrees=[];bgLeaves=[];
+  // 나무들 (원경)
+  for(var i=0;i<12;i++){
+    bgTrees.push({
+      x:Math.random()*W,
+      y:H*0.55+Math.random()*H*0.15,
+      h:60+Math.random()*80,
+      w:18+Math.random()*16,
+      dark:Math.random()<0.5,
+      layer:0,
+    });
+  }
+  // 나무들 (근경 - 양쪽)
+  for(var i=0;i<8;i++){
+    var side=i<4?0:1;
+    bgTrees.push({
+      x:side===0?Math.random()*W*0.22:W*0.78+Math.random()*W*0.22,
+      y:H*0.6+Math.random()*H*0.1,
+      h:120+Math.random()*100,
+      w:28+Math.random()*20,
+      dark:false,
+      layer:1,
+    });
+  }
+  // 나뭇잎 파티클
+  for(var i=0;i<18;i++){
+    bgLeaves.push({
+      x:Math.random()*W,
+      y:Math.random()*H,
+      size:3+Math.random()*5,
+      spd:0.3+Math.random()*0.6,
+      drift:Math.random()*0.8-0.4,
+      alpha:0.3+Math.random()*0.4,
+      color:Math.random()<0.6?'#4cc034':'#3aaa28',
+    });
+  }
+}
+
+function drawTree(t){
+  // 나무 기둥
+  ctx.fillStyle=t.dark?'#2a1a0a':'#3a2a10';
+  ctx.fillRect(t.x-t.w*0.18,t.y-t.h*0.35,t.w*0.36,t.h*0.38);
+  // 잎 (3단계)
+  var colors=t.dark?
+    ['#2d6e1a','#3a8822','#32781e']:
+    ['#3aaa28','#4cc034','#52d038'];
+  var scales=[1.0,0.75,0.55];
+  var offsets=[0,-t.h*0.28,-t.h*0.5];
+  for(var i=0;i<3;i++){
+    ctx.fillStyle=colors[i];
+    ctx.shadowColor='rgba(0,0,0,0.3)';ctx.shadowBlur=8;
+    ctx.beginPath();
+    ctx.moveTo(t.x,t.y-t.h*0.35+offsets[i]-t.h*0.32*scales[i]);
+    ctx.lineTo(t.x+t.w*1.2*scales[i],t.y-t.h*0.35+offsets[i]+t.h*0.15*scales[i]);
+    ctx.lineTo(t.x-t.w*1.2*scales[i],t.y-t.h*0.35+offsets[i]+t.h*0.15*scales[i]);
+    ctx.closePath();ctx.fill();
+    ctx.shadowBlur=0;
+  }
+}
+
+function drawBg(){
+  // 하늘 그라디언트
+  var sky=ctx.createLinearGradient(0,0,0,H*0.55);
+  sky.addColorStop(0,'#87CEEB');
+  sky.addColorStop(0.5,'#a8dff0');
+  sky.addColorStop(1,'#c8eef8');
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H*0.6);
+
+  // 안개 (원경 분위기)
+  var fog=ctx.createLinearGradient(0,H*0.4,0,H*0.62);
+  fog.addColorStop(0,'rgba(200,230,255,0)');
+  fog.addColorStop(1,'rgba(150,200,230,0.15)');
+  ctx.fillStyle=fog;ctx.fillRect(0,H*0.4,W,H*0.25);
+
+  // 원경 나무
+  bgTrees.filter(function(t){return t.layer===0;}).forEach(drawTree);
+
+  // 지면
+  var ground=ctx.createLinearGradient(0,H*0.6,0,H);
+  ground.addColorStop(0,'#8B6340');
+  ground.addColorStop(0.3,'#7a5530');
+  ground.addColorStop(1,'#6a4520');
+  ctx.fillStyle=ground;ctx.fillRect(0,H*0.6,W,H*0.4);
+
+  // 풀숲 경계
+  ctx.fillStyle='#3aaa28';
+  for(var gx=0;gx<W;gx+=22){
+    var gh=8+Math.sin(gx*0.15+frame*0.01)*4+Math.random()*4;
+    ctx.beginPath();
+    ctx.moveTo(gx,H*0.62);
+    ctx.quadraticCurveTo(gx+8,H*0.62-gh,gx+14,H*0.62);
+    ctx.fill();
+  }
+  ctx.fillStyle='#50cc34';
+  for(var gx=8;gx<W;gx+=18){
+    var gh=5+Math.sin(gx*0.2+frame*0.015)*3;
+    ctx.beginPath();
+    ctx.moveTo(gx,H*0.63);
+    ctx.quadraticCurveTo(gx+6,H*0.63-gh,gx+12,H*0.63);
+    ctx.fill();
+  }
+
+  // 근경 나무 (양쪽)
+  bgTrees.filter(function(t){return t.layer===1;}).forEach(drawTree);
+
+  // 떠다니는 나뭇잎
+  bgLeaves.forEach(function(l){
+    l.y+=l.spd;l.x+=l.drift+Math.sin(frame*0.02+l.x)*0.3;
+    if(l.y>H+10){l.y=-10;l.x=Math.random()*W;}
+    ctx.globalAlpha=l.alpha;
+    ctx.fillStyle=l.color;
+    ctx.save();ctx.translate(l.x,l.y);ctx.rotate(frame*0.02+l.x);
+    ctx.beginPath();ctx.ellipse(0,0,l.size,l.size*0.5,0,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  });
+  ctx.globalAlpha=1;
+
+  // 중앙 조명 (너구리 있는 곳)
+  var spot=ctx.createRadialGradient(CX,CY,20,CX,CY,H*0.35);
+  spot.addColorStop(0,'rgba(255,240,180,0.08)');
+  spot.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=spot;ctx.fillRect(0,0,W,H);
+
+  // 비네팅
+  var vg=ctx.createRadialGradient(CX,CY,H*0.15,CX,CY,H*0.75);
+  vg.addColorStop(0,'rgba(0,0,0,0)');
+  vg.addColorStop(1,'rgba(0,0,0,0.4)');
+  ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
+}
+
+// ── 과녁 그리기 ──
+function drawTarget(){
+  var t=target;
+  var pulse=Math.sin(frame*0.06)*0.06+1.0;
+  var bounce=Math.abs(Math.sin(frame*0.04))*4;
+  var s=t.r/38;
+
+  ctx.save();
+  ctx.translate(t.x, t.y-bounce);
+
+  // 외곽 조준 링
+  ctx.strokeStyle='rgba(255,50,50,0.2)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.arc(0,0,t.r*2.2*pulse,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.arc(0,0,t.r*1.5*pulse,0,Math.PI*2);ctx.stroke();
+
+  // 꼬리
+  ctx.fillStyle='#888';
+  ctx.beginPath();ctx.ellipse(28*s,18*s,14*s,9*s,0.5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#555';
+  for(var ti=0;ti<3;ti++){
+    ctx.beginPath();ctx.ellipse(18*s+ti*7*s,20*s,3*s,7*s,0.5,0,Math.PI*2);ctx.fill();
+  }
+
+  // 몸통
+  var bg=ctx.createRadialGradient(-4*s,-2*s,2*s,-4*s,-2*s,26*s);
+  bg.addColorStop(0,'#b8a090');bg.addColorStop(1,'#8a7060');
+  ctx.fillStyle=bg;
+  ctx.beginPath();ctx.ellipse(0,8*s,22*s,18*s,0,0,Math.PI*2);ctx.fill();
+
+  // 배
+  ctx.fillStyle='#d4c4b0';
+  ctx.beginPath();ctx.ellipse(0,12*s,13*s,11*s,0,0,Math.PI*2);ctx.fill();
+
+  // 머리
+  var hg=ctx.createRadialGradient(-3*s,-18*s,4*s,-3*s,-18*s,20*s);
+  hg.addColorStop(0,'#c0a888');hg.addColorStop(1,'#8a7060');
+  ctx.fillStyle=hg;
+  ctx.beginPath();ctx.arc(0,-18*s,20*s,0,Math.PI*2);ctx.fill();
+
+  // 얼굴 흰 부분
+  ctx.fillStyle='#e8ddd0';
+  ctx.beginPath();ctx.ellipse(0,-16*s,13*s,10*s,0,0,Math.PI*2);ctx.fill();
+
+  // 눈 마스크 (너구리!)
+  ctx.fillStyle='#2a1a0a';
+  ctx.beginPath();ctx.ellipse(-8*s,-20*s,7*s,5*s,-0.2,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(8*s,-20*s,7*s,5*s,0.2,0,Math.PI*2);ctx.fill();
+
+  // 리액션 타이머
+  if(raccoonTimer>0) raccoonTimer--;
+  else raccoonReaction='';
+
+  var react=raccoonReaction;
+
+  if(react==='perfect'){
+    // 꿱! - 눈이 X자, 혀 내밀기
+    ctx.strokeStyle='#111';ctx.lineWidth=2*s;
+    [[-8*s,-20*s],[8*s,-20*s]].forEach(function(p){
+      ctx.beginPath();ctx.moveTo(p[0]-3*s,p[1]-3*s);ctx.lineTo(p[0]+3*s,p[1]+3*s);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(p[0]+3*s,p[1]-3*s);ctx.lineTo(p[0]-3*s,p[1]+3*s);ctx.stroke();
+    });
+    // 별 (충격)
+    ctx.font=(9*s)+'px Arial';ctx.textAlign='center';
+    ctx.fillStyle='#ff0';
+    ctx.fillText('★',-18*s,-30*s);
+    ctx.fillText('★',18*s,-30*s);
+    // 혀
+    ctx.fillStyle='#f48';
+    ctx.beginPath();ctx.ellipse(4*s,-7*s,4*s,6*s,0.3,0,Math.PI*2);ctx.fill();
+  } else if(react==='great'){
+    // 아파요~ - 눈물 눈, 찡그린 입
+    ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.arc(-8*s,-20*s,4*s,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(8*s,-20*s,4*s,0,Math.PI*2);ctx.fill();
+    // 찡그린 눈 (반달)
+    ctx.fillStyle='#111';
+    ctx.beginPath();ctx.arc(-8*s,-20*s,2.5*s,Math.PI,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(8*s,-20*s,2.5*s,Math.PI,Math.PI*2);ctx.fill();
+    // 눈물
+    ctx.fillStyle='rgba(100,180,255,0.8)';
+    ctx.beginPath();ctx.ellipse(-8*s,-14*s,2*s,4*s,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(8*s,-14*s,2*s,4*s,0,0,Math.PI*2);ctx.fill();
+    // 아픈 입 (삐침)
+    ctx.strokeStyle='#3a2010';ctx.lineWidth=1.5*s;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(-4*s,-10*s);ctx.quadraticCurveTo(0,-13*s,4*s,-10*s);ctx.stroke();
+  } else if(react==='good'){
+    // 아야! - 눈 감고 찡그림
+    ctx.strokeStyle='#111';ctx.lineWidth=2*s;
+    ctx.beginPath();ctx.moveTo(-11*s,-20*s);ctx.lineTo(-5*s,-20*s);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(5*s,-20*s);ctx.lineTo(11*s,-20*s);ctx.stroke();
+    // 땀방울
+    ctx.fillStyle='rgba(100,180,255,0.7)';
+    ctx.beginPath();ctx.arc(16*s,-28*s,3*s,0,Math.PI*2);ctx.fill();
+    // 입 (ㅇ 모양)
+    ctx.fillStyle='#3a2010';
+    ctx.beginPath();ctx.arc(0,-10*s,3.5*s,0,Math.PI*2);ctx.fill();
+  } else if(react==='miss'){
+    // 메롱! - 혀 쭉 내밀기 + 윙크
+    // 한쪽 눈 윙크
+    ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.arc(-8*s,-20*s,4*s,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#111';
+    ctx.beginPath();ctx.arc(-7*s,-20*s,2.5*s,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.arc(-6*s,-21*s,1*s,0,Math.PI*2);ctx.fill();
+    // 윙크 (오른쪽)
+    ctx.strokeStyle='#111';ctx.lineWidth=2*s;
+    ctx.beginPath();ctx.moveTo(5*s,-22*s);ctx.lineTo(11*s,-18*s);ctx.stroke();
+    // 메롱 혀 (길게)
+    ctx.fillStyle='#f48';
+    ctx.beginPath();ctx.ellipse(0,-5*s,5*s,9*s,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#e03070';
+    ctx.beginPath();ctx.ellipse(0,-1*s,4*s,3*s,0,0,Math.PI*2);ctx.fill();
+    // 손 흔들기
+    ctx.font=(14*s)+'px Arial';ctx.textAlign='center';
+    ctx.fillText('👋',26*s,-5*s);
+  } else {
+    // 기본 표정 (평온)
+    ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.arc(-8*s,-20*s,4*s,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(8*s,-20*s,4*s,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#111';
+    ctx.beginPath();ctx.arc(-7*s,-20*s,2.5*s,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(9*s,-20*s,2.5*s,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.arc(-6*s,-21*s,1*s,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(10*s,-21*s,1*s,0,Math.PI*2);ctx.fill();
+  }
+
+  // 코
+  ctx.fillStyle='#3a2010';
+  ctx.beginPath();ctx.ellipse(0,-13*s,3.5*s,2.5*s,0,0,Math.PI*2);ctx.fill();
+
+  // 기본 입 (리액션 없을 때만)
+  if(!react||react===''){
+    ctx.strokeStyle='#3a2010';ctx.lineWidth=1.5*s;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(-3*s,-11*s);ctx.quadraticCurveTo(0,-9*s,3*s,-11*s);ctx.stroke();
+  }
+
+  // 귀
+  ctx.fillStyle='#8a7060';
+  ctx.beginPath();ctx.ellipse(-16*s,-33*s,7*s,9*s,-0.2,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(16*s,-33*s,7*s,9*s,0.2,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#c09080';
+  ctx.beginPath();ctx.ellipse(-16*s,-33*s,4*s,6*s,-0.2,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(16*s,-33*s,4*s,6*s,0.2,0,Math.PI*2);ctx.fill();
+
+  // 팔
+  ctx.fillStyle='#8a7060';
+  ctx.beginPath();ctx.ellipse(-24*s,4*s,7*s,10*s,-0.4,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(24*s,4*s,7*s,10*s,0.4,0,Math.PI*2);ctx.fill();
+
+  // 다리
+  ctx.beginPath();ctx.ellipse(-10*s,24*s,7*s,9*s,0.1,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(10*s,24*s,7*s,9*s,-0.1,0,Math.PI*2);ctx.fill();
+
+  // 리액션 말풍선
+  if(raccoonReaction&&raccoonTimer>0){
+    var alpha=Math.min(1,raccoonTimer/20);
+    var msgs={perfect:'꿱!!',great:'아야앙~',good:'아야!',miss:'메롱~ 🤪'};
+    var colors={perfect:'#ff0',great:'#4af',good:'#0f8',miss:'#f4a'};
+    var msg=msgs[raccoonReaction]||'';
+    var mc=colors[raccoonReaction]||'#fff';
+    if(msg){
+      ctx.save();ctx.globalAlpha=alpha;
+      ctx.fillStyle='rgba(0,0,0,0.75)';
+      ctx.beginPath();ctx.roundRect(-30*s,-52*s,60*s,20*s,8*s);ctx.fill();
+      ctx.fillStyle=mc;
+      ctx.font='bold '+(11*s)+'px Arial';
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.shadowColor=mc;ctx.shadowBlur=8;
+      ctx.fillText(msg,0,-42*s);
+      ctx.shadowBlur=0;ctx.restore();
+    }
+  }
+
+  // 조준 십자선
+  ctx.strokeStyle='rgba(255,50,50,0.6)';ctx.lineWidth=1;
+  ctx.shadowColor='#f44';ctx.shadowBlur=6;ctx.setLineDash([3,3]);
+  ctx.beginPath();ctx.moveTo(-t.r*0.9,0);ctx.lineTo(t.r*0.9,0);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,-t.r*0.9);ctx.lineTo(0,t.r*0.9);ctx.stroke();
+  ctx.setLineDash([]);ctx.shadowBlur=0;
+
+  ctx.restore();
+}
+
+// ── 조준경 그리기 ──
+function drawScope(){
+  var s=scope;
+  var dist=getDist();
+  var hitZone=target.r+s.r;
+  var overlap=dist<hitZone;
+  var acc=overlap?getAccuracy():0;
+
+  // 겹침 정도에 따른 색상
+  var color=overlap?
+    (acc>0.92?'#ff0':acc>0.75?'#0f8':acc>0.55?'#4af':'rgba(255,255,255,0.8)'):
+    'rgba(255,255,255,0.5)';
+
+  ctx.save();
+  ctx.translate(s.x,s.y);
+
+  // 외부 원
+  ctx.strokeStyle=color;ctx.lineWidth=2;
+  ctx.shadowColor=color;ctx.shadowBlur=overlap?20:8;
+  ctx.beginPath();ctx.arc(0,0,s.r,0,Math.PI*2);ctx.stroke();
+
+  // 내부 작은 원
+  ctx.beginPath();ctx.arc(0,0,s.r*0.15,0,Math.PI*2);ctx.stroke();
+
+  // 십자선 (4분할, 중앙 빈 공간)
+  var gap=s.r*0.3;
+  ctx.lineWidth=1.5;
+  [[0,-s.r,0,-gap],[0,gap,0,s.r],[-s.r,0,-gap,0],[gap,0,s.r,0]].forEach(function(l){
+    ctx.beginPath();ctx.moveTo(l[0],l[1]);ctx.lineTo(l[2],l[3]);ctx.stroke();
+  });
+
+  // 대각선 틱
+  ctx.lineWidth=1;ctx.globalAlpha=0.5;
+  [[s.r*0.7,-s.r*0.7],[s.r*0.7,s.r*0.7],[-s.r*0.7,s.r*0.7],[-s.r*0.7,-s.r*0.7]].forEach(function(p){
+    ctx.beginPath();ctx.moveTo(p[0]*0.85,p[1]*0.85);ctx.lineTo(p[0],p[1]);ctx.stroke();
+  });
+  ctx.globalAlpha=1;
+
+  // 겹쳤을 때 정확도 표시 링
+  if(overlap){
+    ctx.strokeStyle=color;ctx.globalAlpha=acc*0.4;ctx.lineWidth=8;
+    ctx.beginPath();ctx.arc(0,0,s.r*0.6,0,Math.PI*2*acc);ctx.stroke();
+    ctx.globalAlpha=1;
+  }
+
+  ctx.shadowBlur=0;
+  ctx.restore();
+
+  // 대기 중 표시
+  if(waiting){
+    ctx.fillStyle='rgba(255,255,255,0.15)';
+    ctx.font='bold 13px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('RELOAD...', s.x, s.y+s.r+18);
+  }
+}
+
+// ── 스테이지 진행 표시 ──
+function drawStageProgress(){
+  // 스테이지별 쌓이는 게이지
+  var pct=(score%(stage*2000))/(stage*2000);
+  ctx.fillStyle='rgba(255,255,255,0.06)';
+  ctx.fillRect(0,H-3,W,3);
+  var gg=ctx.createLinearGradient(0,0,W*pct,0);
+  gg.addColorStop(0,'#f00');gg.addColorStop(1,'#f80');
+  ctx.fillStyle=gg;
+  ctx.fillRect(0,H-3,W*pct,3);
+}
+
+// ── 효과음 ──
+var sfxCtx=null;
+function getSfx(){
+  if(!sfxCtx)try{sfxCtx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}
+  if(sfxCtx&&sfxCtx.state==='suspended')sfxCtx.resume();
+  return sfxCtx;
+}
+function sfxShoot(acc){
+  var ac=getSfx();if(!ac)return;
+  try{
+    var t=ac.currentTime;
+    // 총소리 (노이즈)
+    var dur=0.15;
+    var buf=ac.createBuffer(1,Math.floor(ac.sampleRate*dur),ac.sampleRate);
+    var d=buf.getChannelData(0);
+    for(var i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,0.4);
+    var src=ac.createBufferSource();src.buffer=buf;
+    var fl=ac.createBiquadFilter();fl.type='bandpass';fl.frequency.value=800+acc*400;fl.Q.value=1;
+    var g=ac.createGain();g.gain.setValueAtTime(0.4,t);g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    src.connect(fl);fl.connect(g);g.connect(ac.destination);
+    src.start(t);src.stop(t+dur+0.02);
+
+    // 명중 톤 (정확도에 따라)
+    if(acc>0.55){
+      var o=ac.createOscillator(),g2=ac.createGain();
+      o.connect(g2);g2.connect(ac.destination);
+      o.type='sine';
+      var freq=400+acc*600;
+      o.frequency.setValueAtTime(freq,t+0.05);
+      o.frequency.exponentialRampToValueAtTime(freq*1.5,t+0.15);
+      g2.gain.setValueAtTime(0.18*acc,t+0.05);
+      g2.gain.exponentialRampToValueAtTime(0.001,t+0.2);
+      o.start(t+0.05);o.stop(t+0.22);
+    }
+    // 퍼펙트 특별음
+    if(acc>0.92){
+      [880,1108,1320].forEach(function(f,i){
+        var o2=ac.createOscillator(),g3=ac.createGain();
+        o2.connect(g3);g3.connect(ac.destination);
+        o2.type='sine';o2.frequency.value=f;
+        g3.gain.setValueAtTime(0.15,t+0.1+i*0.06);
+        g3.gain.exponentialRampToValueAtTime(0.001,t+0.1+i*0.06+0.2);
+        o2.start(t+0.1+i*0.06);o2.stop(t+0.1+i*0.06+0.22);
+      });
+    }
+  }catch(e){}
+}
+function sfxMiss(){
+  var ac=getSfx();if(!ac)return;
+  try{
+    var t=ac.currentTime;
+    var o=ac.createOscillator(),g=ac.createGain();
+    o.connect(g);g.connect(ac.destination);
+    o.type='sawtooth';
+    o.frequency.setValueAtTime(200,t);o.frequency.exponentialRampToValueAtTime(60,t+0.35);
+    g.gain.setValueAtTime(0.2,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.35);
+    o.start(t);o.stop(t+0.37);
+  }catch(e){}
+}
+
+// ── 메인 루프 ──
+function loop(){
+  requestAnimationFrame(loop);
+  frame++;
+
+  // 화면 흔들림
+  if(screenShake>0){
+    ctx.save();
+    ctx.translate((Math.random()-0.5)*screenShake*2,(Math.random()-0.5)*screenShake*2);
+    screenShake=Math.max(0,screenShake-1.5);
+  }
+
+  drawBg();
+
+  if(!gameActive){if(screenShake>0)ctx.restore();return;}
+
+  // 조준경 이동 - 리사주 패턴으로 중앙을 가끔 통과
+  scope.angle+=scope.orbitSpd;
+  scope.wobble+=scope.wobbleSpd;
+  // 진폭 = 과녁 반경 * 1.2 → 중앙을 지나가면서 밖도 나갔다 옴
+  var amp=target.r*1.2;
+  // 리사주 곡선 (주파수비가 다른 두 사인파 합성 → 불규칙한 궤적)
+  var lx=Math.sin(scope.angle*1.0)*amp
+       + Math.sin(scope.angle*1.7+1.2)*amp*0.45;
+  var ly=Math.sin(scope.angle*1.3+0.8)*amp*0.85
+       + Math.sin(scope.angle*2.1+2.4)*amp*0.35;
+  scope.x=target.x+lx;
+  scope.y=target.y+ly;
+  // 화면 밖 안 나가게
+  scope.x=Math.max(scope.r+10,Math.min(W-scope.r-10,scope.x));
+  scope.y=Math.max(scope.r+60,Math.min(H-scope.r-60,scope.y));
+
+  // 그리기
+  drawTarget();
+  drawScope();
+  drawStageProgress();
+
+  // 총알 궤적
+  for(var i=bulletTrails.length-1;i>=0;i--){
+    var bt=bulletTrails[i];
+    bt.life-=0.06;
+    if(bt.life<=0){bulletTrails.splice(i,1);continue;}
+    ctx.globalAlpha=bt.life*0.7;
+    ctx.strokeStyle=bt.color;ctx.lineWidth=2;
+    ctx.shadowColor=bt.color;ctx.shadowBlur=6;
+    ctx.setLineDash([6,4]);
+    ctx.beginPath();ctx.moveTo(bt.x1,bt.y1);ctx.lineTo(bt.x2,bt.y2);ctx.stroke();
+    ctx.setLineDash([]);ctx.shadowBlur=0;
+  }
+  ctx.globalAlpha=1;
+
+  // 파티클
+  for(var i=particles.length-1;i>=0;i--){
+    var p=particles[i];
+    p.x+=p.vx;p.y+=p.vy;p.vy+=0.1;p.vx*=0.97;p.life-=0.025;
+    if(p.life<=0){particles.splice(i,1);continue;}
+    ctx.globalAlpha=p.life;
+    ctx.fillStyle=p.color;ctx.shadowColor=p.color;ctx.shadowBlur=6;
+    ctx.beginPath();ctx.arc(p.x,p.y,Math.max(0,p.sz*p.life),0,Math.PI*2);ctx.fill();
+    ctx.shadowBlur=0;
+  }
+  ctx.globalAlpha=1;
+
+  if(screenShake>0)ctx.restore();
+}
+
+// ── 게임 시작/종료 ──
+function startGame(){
+  getSfx();
+  score=0;lives=3;stage=1;combo=0;maxCombo=0;perfects=0;
+  particles=[];bulletTrails=[];screenShake=0;
+  raccoonReaction='';raccoonTimer=0;
+  initForestBg();
+  document.getElementById('score-val').textContent='0';
+  document.getElementById('combo-val').textContent='x1';
+  document.getElementById('ov-score').style.display='none';
+  document.getElementById('ov-score-lbl').style.display='none';
+  document.getElementById('ov-best').style.display='none';
+  document.getElementById('ov-stats').style.display='none';
+  document.getElementById('overlay').style.display='none';
+  updateLives();
+  initStage();
+  gameActive=true;
+}
+
+function endGame(){
+  gameActive=false;
+  var isNew=score>bestScore;
+  if(isNew){bestScore=score;localStorage.setItem('snBest',bestScore);}
+  document.getElementById('ov-score').textContent=score;
+  document.getElementById('ov-score').style.display='block';
+  document.getElementById('ov-score-lbl').style.display='block';
+  var bestEl=document.getElementById('ov-best');
+  bestEl.textContent=isNew?'🏆 신기록!':'최고: '+bestScore+'점';
+  bestEl.style.display='block';
+  var stats=document.getElementById('ov-stats');
+  stats.style.display='flex';
+  document.getElementById('st-perfect').textContent=perfects;
+  document.getElementById('st-combo').textContent=maxCombo;
+  document.getElementById('st-stage').textContent=stage;
+  document.querySelector('.ov-title').textContent='🎯 타이밍 저격';
+  document.getElementById('play-btn').textContent='🎯 다시 저격';
+  document.getElementById('overlay').style.display='flex';
+}
+
+// ── 입력 ──
+function addEL(el,ev,fn,opts){if(el)el.addEventListener(ev,fn,opts||false);}
+
+addEL(canvas,'touchstart',function(e){
+  e.preventDefault();
+  if(gameActive)shoot();
+},{passive:false});
+addEL(canvas,'mousedown',function(e){
+  if(gameActive)shoot();
+},false);
+addEL(window,'keydown',function(e){
+  if(e.key===' '||e.key==='Enter'){e.preventDefault();if(gameActive)shoot();}
+},false);
+
+// 시작 버튼
+var playBtn=document.getElementById('play-btn');
+var btnTouched=false;
+addEL(playBtn,'touchstart',function(e){e.preventDefault();e.stopPropagation();},false);
+addEL(playBtn,'touchend',function(e){
+  e.preventDefault();e.stopPropagation();
+  btnTouched=true;startGame();
+  setTimeout(function(){btnTouched=false;},600);
+},false);
+addEL(playBtn,'click',function(){if(btnTouched)return;startGame();},false);
+
+loop();
+</script>
+</body>
+</html>
